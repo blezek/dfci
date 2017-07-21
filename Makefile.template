@@ -1,0 +1,35 @@
+
+
+# Write a Makefile to process the ADNI Data
+all: ${features}
+
+{{/* First find all the unique subjects */}}
+{{ range query "select * from adni where type = 'Hippocampal_Mask' order by subject" -}}
+{{ $subject := .subject -}}
+      {{ range printf "select * from adni where subject = '%s' and type = 'MPR_' and substr('%s',1,10) = substr(series,1,10)" $subject $date | query -}}
+
+# Generate {{ .subject }}/{{ .date }}-{{.series }}.csv
+subjects += {{.subject}}
+features += {{ .subject }}/{{ .date }}-{{.series }}.json
+.PHONY: {{.subject}} clean-{{.subject}}
+{{.subject}}:: {{ .subject }}/{{ .date }}-{{.series }}.json
+{{ .subject }}/{{ .date }}-{{.series }}.nii.gz:
+	mrconvert -quiet -force {{ .subject }}/MP-RAGE_REPEAT/MP-RAGE/{{.series}} $@
+#	mrconvert -quiet -force {{ .subject }}/MP-RAGE_REPEAT/MP-RAGE/{{.series}} {{ .subject }}/{{ .date }}-{{.series }}-temp.nii.gz
+#	c3d {{ .subject }}/{{ .date }}-{{.series }}-temp.nii.gz -orient RAS $@
+#	rm {{ .subject }}/{{ .date }}-{{.series }}-temp.nii.gz
+
+{{ .subject }}/{{.date}}-{{.series }}-mask.nii.gz: {{ .subject }}/{{ .date }}-{{.series }}.nii.gz {{.subject}}/MP-RAGE_REPEAT/Hippocampal_Mask/{{$date}}/*/*.nii
+	c3d {{ .subject }}/{{ .date }}-{{.series }}.nii.gz {{.subject}}/MP-RAGE_REPEAT/Hippocampal_Mask/{{$date}}/*/*.nii -reslice-identity -o $@
+
+{{ .subject }}/{{ .date }}-{{.series }}.json: {{ .subject }}/{{ .date }}-{{.series }}.nii.gz {{ .subject }}/{{.date}}-{{ .series }}-mask.nii.gz
+	pyradiomics $+ --out $@ --format json
+
+clean-{{.subject}}::
+	rm {{ .subject }}/{{ .date }}-{{.series }}.nii.gz
+	rm {{ .subject }}/{{ .date }}-{{.series }}.json
+	rm {{ .subject }}/Hippocampal_Mask-{{.series }}.nii.gz
+
+      {{ end -}}
+  {{end -}}
+{{end -}}

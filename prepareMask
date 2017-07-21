@@ -1,0 +1,30 @@
+#!/bin/sh
+
+set -e
+input=$1
+output=$2
+
+temp=/tmp/$(uuidgen).nii.gz
+
+# Calculate the connected components, then label the left hippocampus 1, right hippocampus 2
+c3d $input -connected-components -o $temp
+com=$(fslstats -K $temp  $temp -C)
+a=$(echo $com | awk '{print $1}' )
+b=$(echo $com | awk '{print $4}' )
+# b=$(fslstats $temp -l 2 -u 2 -c | awk '{print $1}' )
+# Pa=$(fslstats $temp -c |  CENTROID_MM | awk '{print $1}' )
+# b=$(c3d $temp -thresh 2 2 1 0 -centroid | awk '{print $1}' )
+
+echo COM: $com
+echo found COM to be $a and $b
+
+# Swap
+if (( $(echo "$a < $b" | bc -l) )); then
+  echo ...Swapping
+  c3d $temp -thresh 1 1 2 0 $temp -thresh 2 2 1 0 -add -o $output
+else
+  echo ...NOT Swapping
+  c3d $temp -thresh 1 1 1 0 $temp -thresh 2 2 2 0 -add -o $output
+fi
+
+rm -f $temp
