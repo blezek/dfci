@@ -12,38 +12,37 @@
 
     
     <!-- Other scripts -->
-
     <!-- JS includes -->
-    <link rel="stylesheet" href="Skeleton/css/normalize.css" />
-    <link rel="stylesheet" href="Skeleton/css/skeleton.css" />
-
+    
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/webcomponentsjs/0.7.24/webcomponents-lite.js"></script>
-    <link rel="import" href="facets.html" >
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <link rel="import" href="facets.html" >
   </head>
 
 
   <body>
 
-    <div class="container">
-      <div class="row">
-        <h1>Overview of Pyradiomics features generated on ADNI datasets</h1>
-      </div>
+    <h2>Overview of Pyradiomics features generated on ADNI datasets</h2>
     
-      <facets-overview id="elem"></facets-overview>
-    </div>
+    
+    <facets-overview id="facets"></facets-overview>
+    <facets-dive id="dive"></facets-dive>
     <script>
 
-    // Get features.json and load
-    $.getJSON({url: "features.json"})
-     .done(function(data){
-       var overview = $("#elem")[0];
-       var proto = overview.getStatsProto([
-         {data: data, name: "ADNI Features"}
-       ]);
-       overview.protoInput = proto;
-     });
+      // Get features.json and load
+      $.getJSON({url: "features.json"})
+       .done(function(data){
+         var overview = $("#facets")[0];
+         var proto = overview.getStatsProto([
+           {data: data, name: "ADNI Features"}
+         ]);
+         overview.protoInput = proto;
 
-    </script>
+         // Dive
+         $("#dive")[0].data = data;
+         
+       });
+
+      </script>
   </body>
 </html>

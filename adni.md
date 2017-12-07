@@ -103,3 +103,42 @@ fsleyes M.nii.gz H.nii.gz
 
 
 ```
+
+
+# Cross referencing data with scores
+
+
+```sql
+
+# Load CSV data
+cd /VolumesExternal/
+
+sqlite3 ADNI/adni.db
+.mode csv
+import ADNIMERGE.csv scores
+
+-- A view of the data
+create view subject_diagnosis as
+select scores.Dx_bl, adni.*
+from adni, scores
+where
+1=1
+and adni.subject = scores.PTID
+and substr ( adni.date, 0, 10 ) = substr ( scores.examDATE, 0, 10 )
+and type like 'MP%'
+;
+
+```
+
+## Dump scores to a CSV file
+
+```
+sqlite3 ADNI/adni.db
+SQLite version 3.20.1 2017-08-24 16:21:36
+Enter ".help" for usage hints.
+sqlite> .headers on
+sqlite> .mode csv
+sqlite> .output scores.csv
+sqlite> select * from subject_diagnosis;
+sqlite> .quit
+```
