@@ -1,5 +1,4 @@
-
-
+# LLG GBM Classification
 
 Link for the LGG segmentations (yes, it is that long):
 
@@ -13,4 +12,43 @@ https://wiki.cancerimagingarchive.net/download/attachments/25789042/TCIA_LGG_cas
 ## helpful packages
 
 https://github.com/broadinstitute/keras-resnet
+
+
+## Running
+
+```
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64/
+./miniconda/bin/jupyter-notebook --no-browser --ip 0.0.0.0 
+```
+
+# Command line usage
+
+Setup miniconda by
+
+```sh
+source miniconda/bin/activate root
+```
+
+## Compile and install ANTs
+
+```sh
+sudo yum install -y cmake3
+cd Source
+git clone https://github.com/ANTsX/ANTs.git
+mkdir ANTs-build
+cd ANTs-build
+cmake3 ../ANTs
+make -j 12
+
+( cd ANTS-build && sudo make install )
+```
+
+## Process
+
+```sh
+# preprocess
+cat subjects.txt | parallel --progress --eta python ./preprocess  --debug ~/Data/NiFTiSegmentationsEdited/ {} ~/Data/test/
+```
+
+
 
