@@ -6,17 +6,20 @@
 # import libraries
 
 import os
-import random
+import random, math
 import shutil
 import numpy as np
 import sys, tempfile, time, shlex, subprocess, datetime
 import nibabel as nib
-import os
+import os, json, codecs
 import argparse
 import scipy.misc as smi
 import re
 import glob
 import logging
+from openpyxl import load_workbook
+import pandas as pd
+from itertools import islice
 
 def execute(cmdline, logger=logging):
     logger.debug ( cmdline )
@@ -29,86 +32,134 @@ def execute(cmdline, logger=logging):
         universal_newlines=True)
     for stdout_line in iter(popen.stdout.readline, ""):
         logger.debug(stdout_line.strip())
-    popen.stdout.close()
-    return_code = popen.wait()
-    elapsed = time.time() - time_start
-    d = str ( datetime.timedelta ( seconds=elapsed ) )
-    logger.info ( 'Command finished, elapsed time {}'.format(d))
+        popen.stdout.close()
+        return_code = popen.wait()
+        elapsed = time.time() - time_start
+        d = str ( datetime.timedelta ( seconds=elapsed ) )
+        logger.info ( 'Command finished, elapsed time {}'.format(d))
 
-def preprocess ( args ):
-  subject = args.subject
-  dir = os.path.join ( args.dataDirectory, subject )
-  # Find our images
-  imageGlob = glob.glob ( os.path.join ( dir, '*T1*.nii.gz'))
-  t2Glob = glob.glob ( os.path.join ( dir, '*T2*.nii.gz'))
-  segmentationGlob = glob.glob ( os.path.join (dir, '*Segmentation.nii.gz') )
+def preprocess_spreadsheet ( args ):
+    wb = load_workbook ( args.spread_sheet )
+    ws = wb.active
+    data = ws.values
+    cols = next(data)[1:]
+    data = list(data)
+    idx = [r[0] for r in data]
+
+    logging.debug ( str(data))
+    # Create a structure
+    structure = {}
+    subjects = structure.setdefault('subjects', {})
+    
+    for item in data:
+        subject = {
+            'id': item[0],
+            'deletion_status': item[1],
+            'cancer': item[2],
+            'class': 1 if item[1] == 'd/d' else 0
+        }
+        subjects[item[0]] = subject
+
+    subject_list = list ( subjects.keys() )
+    random.shuffle ( subject_list )
+    half = int (math.ceil (len ( subject_list ) / 2))
+    quarter = int (math.ceil (len ( subject_list ) / 4))
+    structure['train'] = subject_list[0:half]
+    structure['test'] = subject_list[half+1:half+quarter]
+    structure['validate'] = subject_list[half+quarter+1:]
         
-  if len(imageGlob) != 1 or len(segmentationGlob) != 1 or len(t2Glob) != 1:
-    return
-
-  temporary_directory = tempfile.mkdtemp(prefix='lgg.preprocess.' )
-
-  # Resample to 1x1x1
-  cmdline = "ResampleImage 3 {} {}/T1.nii.gz 1x1x1 0 4".format ( imageGlob[0], temporary_directory )
-  execute ( cmdline )
-  cmdline = "ResampleImage 3 {} {}/T2.nii.gz 1x1x1 0 4".format ( t2Glob[0], temporary_directory )
-  execute ( cmdline )
-  cmdline = "ResampleImage 3 {} {}/Segmentation.nii.gz 1x1x1 0 1".format ( segmentationGlob[0], temporary_directory )
-  execute ( cmdline )
-
-
-  # Load the images
-  t1_header = nib.load ( "{}/T1.nii.gz".format ( temporary_directory) )
-  t2_header = nib.load ( "{}/T2.nii.gz".format ( temporary_directory) )
-  segmentation_header = nib.load ( "{}/Segmentation.nii.gz".format ( temporary_directory) )
-  t1 = t1_header.get_data()
-  t2 = t2_header.get_data()
-  segmentation = segmentation_header.get_data()
-
-  count = 0
-  # Find slices to save
-  idx = np.nonzero ( np.sum ( segmentation, axis=(0,1)))
-  for slice in idx[0]:
-    t = nib.Nifti1Image ( t1[:,:,slice], np.eye(4))
-    nib.save ( t, "{}/{}-{}-T1.nii.gz".format ( args.outputDirectory, subject, count))
-    t = nib.Nifti1Image ( t2[:,:,slice], np.eye(4))
-    nib.save ( t, "{}/{}-{}-T2.nii.gz".format ( args.outputDirectory, subject, count))
-    t = nib.Nifti1Image ( segmentation[:,:,slice], np.eye(4))
-    nib.save ( t, "{}/{}-{}-Segmentation.nii.gz".format ( args.outputDirectory, subject, count))
-    count += 1
-  # Find slices to save
-  idx = np.nonzero ( np.sum ( segmentation, axis=(1,2)))
-  for slice in idx[0]:
-    t = nib.Nifti1Image ( t1[slice,:,:], np.eye(4))
-    nib.save ( t, "{}/{}-{}-T1.nii.gz".format ( args.outputDirectory, subject, count))
-    t = nib.Nifti1Image ( t2[slice,:,:], np.eye(4))
-    nib.save ( t, "{}/{}-{}-T2.nii.gz".format ( args.outputDirectory, subject, count))
-    t = nib.Nifti1Image ( segmentation[slice,:,:], np.eye(4))
-    nib.save ( t, "{}/{}-{}-Segmentation.nii.gz".format ( args.outputDirectory, subject, count))
-    count += 1
-  # Find slices to save
-  idx = np.nonzero ( np.sum ( segmentation, axis=(0,2)))
-  for slice in idx[0]:
-    t = nib.Nifti1Image ( t1[:,slice,:], np.eye(4))
-    nib.save ( t, "{}/{}-{}-T1.nii.gz".format ( args.outputDirectory, subject, count))
-    t = nib.Nifti1Image ( t2[:,slice,:], np.eye(4))
-    nib.save ( t, "{}/{}-{}-T2.nii.gz".format ( args.outputDirectory, subject, count))
-    t = nib.Nifti1Image ( segmentation[:,slice,:], np.eye(4))
-    nib.save ( t, "{}/{}-{}-Segmentation.nii.gz".format ( args.outputDirectory, subject, count))
-    count += 1
-if __name__ == "__main__":
-  parser = argparse.ArgumentParser( description='Create data for lgg')
-  parser.add_argument ( "--debug",  help="Save some temp patches for debugging purposes", action='store_true' )
-  parser.add_argument ( "dataDirectory", help="directory with T1, T2 and segmentation files")
-  parser.add_argument ( 'subject', help="Subject number")
-  parser.add_argument ( "outputDirectory", help="where to save data, will create sub directories as needed")
+    with open(args.output, 'wb') as f:
+        json.dump(structure, codecs.getwriter('utf-8')(f), ensure_ascii=False, indent=4, sort_keys=True)
+    
+def preprocess ( args ):
+    subject = args.subject
+    dir = os.path.join ( args.dataDirectory, subject )
+    # Find our images
+    imageGlob = glob.glob ( os.path.join ( dir, '*T1*.nii.gz'))
+    t2Glob = glob.glob ( os.path.join ( dir, '*T2*.nii.gz'))
+    segmentationGlob = glob.glob ( os.path.join (dir, '*Segmentation.nii.gz') )
   
-  args = parser.parse_args()
-  logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-  logging.getLogger().setLevel ( logging.INFO )
-  if args.debug:
-    logging.getLogger().setLevel ( logging.DEBUG )
+    if len(imageGlob) != 1 or len(segmentationGlob) != 1 or len(t2Glob) != 1:
+        return
 
-  preprocess ( args )
+    temporary_directory = tempfile.mkdtemp(prefix='lgg.preprocess.', dir=args.temp_dir )
+
+    # Resample to 256x256x256
+    cmdline = "ResampleImage 3 {} {}/T1.nii.gz 256x256x256 1 4".format ( imageGlob[0], temporary_directory )
+    execute ( cmdline )
+    cmdline = "ResampleImage 3 {} {}/T2.nii.gz 256x256x256 1 4".format ( t2Glob[0], temporary_directory )
+    execute ( cmdline )
+    cmdline = "ResampleImage 3 {} {}/Segmentation.nii.gz 256x256x256 1 1".format ( segmentationGlob[0], temporary_directory )
+    execute ( cmdline )
+
+
+    # Load the images
+    t1_header = nib.load ( "{}/T1.nii.gz".format ( temporary_directory) )
+    t2_header = nib.load ( "{}/T2.nii.gz".format ( temporary_directory) )
+    segmentation_header = nib.load ( "{}/Segmentation.nii.gz".format ( temporary_directory) )
+    t1 = t1_header.get_data()
+    t2 = t2_header.get_data()
+    segmentation = segmentation_header.get_data()
+
+    count = 0
+    # Find slices to save
+    idx = np.nonzero ( np.sum ( segmentation, axis=(0,1)))
+    for slice in idx[0]:
+        t = nib.Nifti1Image ( t1[:,:,slice], np.eye(4))
+        nib.save ( t, "{}/{}-{}-T1.nii.gz".format ( args.outputDirectory, subject, count))
+        t = nib.Nifti1Image ( t2[:,:,slice], np.eye(4))
+        nib.save ( t, "{}/{}-{}-T2.nii.gz".format ( args.outputDirectory, subject, count))
+        t = nib.Nifti1Image ( segmentation[:,:,slice], np.eye(4))
+        nib.save ( t, "{}/{}-{}-Segmentation.nii.gz".format ( args.outputDirectory, subject, count))
+        count += 1
+        # Find slices to save
+    idx = np.nonzero ( np.sum ( segmentation, axis=(1,2)))
+    for slice in idx[0]:
+        t = nib.Nifti1Image ( t1[slice,:,:], np.eye(4))
+        nib.save ( t, "{}/{}-{}-T1.nii.gz".format ( args.outputDirectory, subject, count))
+        t = nib.Nifti1Image ( t2[slice,:,:], np.eye(4))
+        nib.save ( t, "{}/{}-{}-T2.nii.gz".format ( args.outputDirectory, subject, count))
+        t = nib.Nifti1Image ( segmentation[slice,:,:], np.eye(4))
+        nib.save ( t, "{}/{}-{}-Segmentation.nii.gz".format ( args.outputDirectory, subject, count))
+        count += 1
+    # Find slices to save
+    idx = np.nonzero ( np.sum ( segmentation, axis=(0,2)))
+    for slice in idx[0]:
+        t = nib.Nifti1Image ( t1[:,slice,:], np.eye(4))
+        nib.save ( t, "{}/{}-{}-T1.nii.gz".format ( args.outputDirectory, subject, count))
+        t = nib.Nifti1Image ( t2[:,slice,:], np.eye(4))
+        nib.save ( t, "{}/{}-{}-T2.nii.gz".format ( args.outputDirectory, subject, count))
+        t = nib.Nifti1Image ( segmentation[:,slice,:], np.eye(4))
+        nib.save ( t, "{}/{}-{}-Segmentation.nii.gz".format ( args.outputDirectory, subject, count))
+        count += 1
+    logging.debug ( "Deleting temp directory {}".format ( temporary_directory))
+    shutil.rmtree(temporary_directory)
+
+        
+if __name__ == "__main__":
+    masterParser = argparse.ArgumentParser( description='Preprocess data for lgg')
+    masterParser.add_argument ( "--debug",  help="Save some temp patches for debugging purposes", action='store_true' )
+    subParser = masterParser.add_subparsers()
+
+    parser = subParser.add_parser ( 'image', help="preprocess image data")
+    parser.set_defaults ( function=preprocess )
+    parser.add_argument ( "--debug",  help="Save some temp patches for debugging purposes", action='store_true' )
+    parser.add_argument ( "--temp-dir",  help="Temporary directory" )
+    parser.add_argument ( "dataDirectory", help="directory with T1, T2 and segmentation files")
+    parser.add_argument ( 'subject', help="Subject number")
+    parser.add_argument ( "outputDirectory", help="where to save data, will create sub directories as needed")
+
+    parser = subParser.add_parser ( 'subjects', help="preprocess clinical data")
+    parser.set_defaults ( function=preprocess_spreadsheet )
+    parser.add_argument ( "spread_sheet", help="spreadsheet containing clinical data")
+    parser.add_argument ( "output", help="json file containining preprocessed clinical data")
+
+    args = masterParser.parse_args()
+    logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    logging.getLogger().setLevel ( logging.INFO )
+    if args.debug:
+        logging.getLogger().setLevel ( logging.DEBUG )
+
+    args.function ( args )
 
 

@@ -46,9 +46,33 @@ make -j 12
 ## Process
 
 ```sh
+source miniconda/bin/activate root
 # preprocess
-cat subjects.txt | parallel --progress --eta python ./preprocess  --debug ~/Data/NiFTiSegmentationsEdited/ {} ~/Data/test/
+mkdir -p ~/Data/test/ ~/Data/temp/
+python preprocess subjects LGG-GBM/TCIA_LGG_cases_159.xlsx subjects.json
+jq -r '.subjects[].id' subjects.json | parallel -j 10 --progress --eta python ./preprocess image  --temp-dir ~/Data/temp --debug ~/Data/NiFTiSegmentationsEdited/ {} ~/Data/test/
+
+# Start training
+python train train $HOME/Data/test --batch-size 64 --epochs 3000 subjects.json weights.h5
+
 ```
 
 
+
+# Results
+
+## Resnet 18
+
+```sh
+python train train $HOME/Data/test --batch-size 64 --epochs 3000 --model resnet18 subjects.json weights.h5
+```
+
+Seems to over-fit, as loss kept going down, accuracy hit a plateau, and validation accuracy bounced around.
+
+
+```sh
+for model in resnet18 resnet34 resnet50 resnet101 resnet152 resnet200; do
+    python train train $HOME/Data/test --batch-size 64 --epochs 3000 --model $model subjects.json weights.h5 | tee $model.log
+done
+```
 
