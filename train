@@ -72,14 +72,14 @@ class ImageSequence(Sequence):
         for fn in glob.glob( os.path.join ( dataPath, "*T1*.gz")):
           for match in subjects:
             if os.path.basename(fn).startswith ( match ):
-              selected.append ( fn )
-              class_map[fn] = subjectClass[match]["class"]
-              break
+                selected.append ( fn )
+                class_map[fn] = subjectClass[match]["class"]
+                break
         selected = sorted(selected)
         self.t1Filenames = selected
         self.t2Filenames = [ x.replace ( 'T1', 'T2') for x in selected]
         self.segmentationFilenames = [ x.replace ( 'T1', 'Segmentation') for x in selected]
-        self.logger.info ( "Found {} files in {}".format ( len(self.t1Filenames), dataPath ))
+        self.logger.debug ( "Found {} files in {}".format ( len(self.t1Filenames), dataPath ))
         c = [ class_map[x] for x in self.t1Filenames]
         self.classes = np.array ( c )
 
@@ -113,135 +113,138 @@ class ImageSequence(Sequence):
 
 
 def makeBlockModel(args):
-  K.set_image_data_format('channels_last')
+    K.set_image_data_format('channels_last')
 
-  # resnet
-  x = keras.layers.Input ( (256,256,2) )
-  if args.model.lower() == 'resnet50':
-    return keras_resnet.models.ResNet50 ( x, classes=2 )
-  if args.model.lower() == 'resnet18':
-    return keras_resnet.models.ResNet18 ( x, classes=2 )
-  if args.model.lower() == 'resnet34':
-    return keras_resnet.models.ResNet34 ( x, classes=2 )
-  if args.model.lower() == 'resnet50':
-    return keras_resnet.models.ResNet50 ( x, classes=2 )
-  if args.model.lower() == 'resnet101':
-    return keras_resnet.models.ResNet101 ( x, classes=2 )
-  if args.model.lower() == 'resnet152':
-    return keras_resnet.models.ResNet152 ( x, classes=2 )
-  if args.model.lower() == 'resnet200':
-    return keras_resnet.models.ResNet200 ( x, classes=2 )
+    # resnet
+    x = keras.layers.Input ( (256,256,2) )
+    if args.model.lower() == 'resnet50':
+        return keras_resnet.models.ResNet50 ( x, classes=2 )
+    if args.model.lower() == 'resnet18':
+        return keras_resnet.models.ResNet18 ( x, classes=2 )
+    if args.model.lower() == 'resnet34':
+        return keras_resnet.models.ResNet34 ( x, classes=2 )
+    if args.model.lower() == 'resnet50':
+        return keras_resnet.models.ResNet50 ( x, classes=2 )
+    if args.model.lower() == 'resnet101':
+        return keras_resnet.models.ResNet101 ( x, classes=2 )
+    if args.model.lower() == 'resnet152':
+        return keras_resnet.models.ResNet152 ( x, classes=2 )
+    if args.model.lower() == 'resnet200':
+        return keras_resnet.models.ResNet200 ( x, classes=2 )
 
   
-  model = Sequential()
-  # 1st layer group
-  model.add(Convolution2D(16, (3, 3), activation='relu',
-                          padding='same', name='conv1',
-                          input_shape=(256,256,2)))
-  model.add(MaxPooling2D(pool_size=(2,2),
-                         border_mode='valid', name='pool1'))
-  # 2nd layer group
-  model.add(Convolution2D(32, (3, 3), activation='relu',
-                          border_mode='same', name='conv2'))
-  model.add(MaxPooling2D(pool_size=(2,2),
-                         border_mode='valid', name='pool2'))
-  # 2nd layer group
-  model.add(Convolution2D(64, (3, 3), activation='relu',
-                          border_mode='same', name='conv3'))
-  model.add(MaxPooling2D(pool_size=(2,2),
-                         border_mode='valid', name='pool3'))
-  # 2nd layer group
-  model.add(Convolution2D(96, (3, 3), activation='relu',
-                          border_mode='same', name='conv4'))
-  model.add(MaxPooling2D(pool_size=(2,2),
-                         border_mode='valid', name='pool4'))
-  
-  model.add(Convolution2D(128, (3, 3), activation='relu',
-                          border_mode='same', name='conv5a'))
-  model.add(Convolution2D(160, (3, 3), activation='relu',
-                          border_mode='same', name='conv5b'))
-  # model.add(ZeroPadding2D(padding=(0, 1, 1)))
-  model.add(MaxPooling2D(pool_size=(2,2),
-                         border_mode='valid', name='pool5'))
-  model.add(Flatten()) # Maybe should replace with GlobalAveragePooling or even better GlobalMaxPooling2D  x = GlobalMaxPooling2D()(x)
-  # FC layers group
-  model.add(Dense(64, activation='relu', name='fc6'))
-  model.add(Dropout(.25))
-  model.add(Dense(32, activation='relu', name='fc7'))
-  model.add(Dropout(.25))
-  model.add(Dense(2, activation='sigmoid', name='fc8'))
-  return model
-  
+    model = Sequential()
+    # 1st layer group
+    model.add(Convolution2D(16, (3, 3), activation='relu',
+                            padding='same', name='conv1',
+                            input_shape=(256,256,2)))
+    model.add(MaxPooling2D(pool_size=(2,2),
+                           border_mode='valid', name='pool1'))
+    # 2nd layer group
+    model.add(Convolution2D(32, (3, 3), activation='relu',
+                            border_mode='same', name='conv2'))
+    model.add(MaxPooling2D(pool_size=(2,2),
+                           border_mode='valid', name='pool2'))
+    # 2nd layer group
+    model.add(Convolution2D(64, (3, 3), activation='relu',
+                            border_mode='same', name='conv3'))
+    model.add(MaxPooling2D(pool_size=(2,2),
+                           border_mode='valid', name='pool3'))
+    # 2nd layer group
+    model.add(Convolution2D(96, (3, 3), activation='relu',
+                            border_mode='same', name='conv4'))
+    model.add(MaxPooling2D(pool_size=(2,2),
+                           border_mode='valid', name='pool4'))
+    
+    model.add(Convolution2D(128, (3, 3), activation='relu',
+                            border_mode='same', name='conv5a'))
+    model.add(Convolution2D(160, (3, 3), activation='relu',
+                            border_mode='same', name='conv5b'))
+    # model.add(ZeroPadding2D(padding=(0, 1, 1)))
+    model.add(MaxPooling2D(pool_size=(2,2),
+                           border_mode='valid', name='pool5'))
+    model.add(Flatten()) # Maybe should replace with GlobalAveragePooling or even better GlobalMaxPooling2D  x = GlobalMaxPooling2D()(x)
+    # FC layers group
+    model.add(Dense(64, activation='relu', name='fc6'))
+    model.add(Dropout(.25))
+    model.add(Dense(32, activation='relu', name='fc7'))
+    model.add(Dropout(.25))
+    model.add(Dense(2, activation='sigmoid', name='fc8'))
+    return model
+
 
 def buildModel(args):
-  with open(args.subjects, 'r') as f:
-    subjects = json.load(f)
+    with open(args.subjects, 'r') as f:
+        subjects = json.load(f)
 
-  model = makeBlockModel(args)
-  print(model.summary())
+    model = makeBlockModel(args)
+    logging.debug(model.summary())
 
-  lrate = 0.001
-  model.compile(optimizer=SGD(lr=lrate), loss=binary_crossentropy, metrics=['accuracy'])
+    lrate = 0.001
+    model.compile(optimizer=SGD(lr=lrate), loss=binary_crossentropy, metrics=['accuracy'])
 
-  if args.model_image:
-    plot_model(model,to_file=args.model_image, show_shapes=True)
+    if args.model_image:
+        plot_model(model,to_file=args.model_image, show_shapes=True)
 
-  modelCheckpoint = ModelCheckpoint( args.weightsFilename, verbose=1, monitor='loss',save_best_only=True)
-  earlyStoppingCallback = EarlyStopping(monitor='loss', patience=15)
-  callbacks = [earlyStoppingCallback]
-  if args.tensorboard:
-    tensorboardCallback = TensorBoard(log_dir=args.tensorboard)
-    callbacks.append ( tensorboardCallback )
+    modelCheckpoint = ModelCheckpoint( args.weightsFilename, verbose=1, monitor='loss',save_best_only=True)
+    earlyStoppingCallback = EarlyStopping(monitor='loss', patience=15)
+    callbacks = [earlyStoppingCallback]
+    if args.tensorboard:
+        logging.info ( "Saving tensorboard output" )
+        tensorboardCallback = TensorBoard(log_dir=args.tensorboard)
+        callbacks.append ( tensorboardCallback )
 
-  trainSequence = ImageSequence ( args.dataPath, subjects['train'], subjects['subjects'], args.batch_size )
-  testSequence = ImageSequence ( args.dataPath, subjects['test'], subjects['subjects'], args.batch_size )
-  validationSequence = ImageSequence ( args.dataPath, subjects['validate'], subjects['subjects'], args.batch_size )
+    logging.info ( "constructing sequences" )
+    trainSequence = ImageSequence ( args.dataPath, subjects['train'], subjects['subjects'], args.batch_size )
+    testSequence = ImageSequence ( args.dataPath, subjects['test'], subjects['subjects'], args.batch_size )
+    validationSequence = ImageSequence ( args.dataPath, subjects['validate'], subjects['subjects'], args.batch_size )
 
-  history = model.fit_generator(
-    trainSequence,
-    steps_per_epoch=len(trainSequence),
-    validation_data = validationSequence,
-    validation_steps = len(validationSequence),
-    epochs=args.epochs,
-    use_multiprocessing=True,
-    workers=args.workers,
-    verbose=1,
-    shuffle=True,
-    callbacks=callbacks
-  )
+    logging.info ( "starting model fit" )
+    history = model.fit_generator(
+        trainSequence,
+        steps_per_epoch=len(trainSequence),
+        validation_data = validationSequence,
+        validation_steps = len(validationSequence),
+        epochs=args.epochs,
+        use_multiprocessing=True,
+        workers=args.workers,
+        verbose=1,
+        shuffle=True,
+        callbacks=callbacks
+    )
 
-  loss = model.evaluate_generator (
-    testSequence,
-    steps=len(testSequence),
-    workers=args.workers,
-    use_multiprocessing=True
-  )
-  logger.info ( "test loss: {}".format(loss))
-  
-  model.save ( args.weightsFilename )
+    loss = model.evaluate_generator (
+        testSequence,
+        steps=len(testSequence),
+        workers=args.workers,
+        use_multiprocessing=True
+    )
+    logging.info ( "test loss: {}".format(loss))
+    
+    model.save ( args.weightsFilename )
 
 if __name__ == "__main__":
-  masterParser = argparse.ArgumentParser( description='machine learning for LGG-GBM dataset')
-  masterParser.add_argument ( '--debug', help="Debug output", action='store_true')
-  parser = masterParser.add_subparsers()
-  
-  subParser = parser.add_parser("train", help="train the model")
-  subParser.set_defaults ( function=buildModel )
-  subParser.add_argument ( "--batch-size",  help="batch size for training", required=False, type=int,  default=16 )
-  subParser.add_argument ( "--epochs",  help="number of epochs to run", required=False, type=int,  default=300 )
-  subParser.add_argument ( "--workers",  help="number background workers", required=False, type=int,  default=8 )
-  subParser.add_argument ( "--tensorboard", help="directory for tensor board" )
-  subParser.add_argument ( "--model-image", help="save a PNG of the model" )
-  subParser.add_argument ( "--model", help="model type, must be resnet18, resnet34, resnet50, resnet101, resnet152, resnet200", default=None )
-  subParser.add_argument ( "dataPath", help="path to directory data and segmentations")
-  subParser.add_argument ( "subjects", help="JSON file with subject data, generated using preprocess")
-  subParser.add_argument ( "weightsFilename", help="save weights to this file in HDF5 format")
+    masterParser = argparse.ArgumentParser( description='machine learning for LGG-GBM dataset')
+    masterParser.add_argument ( '--debug', help="Debug output", action='store_true')
+    parser = masterParser.add_subparsers()
+    
+    subParser = parser.add_parser("train", help="train the model")
+    subParser.set_defaults ( function=buildModel )
+    subParser.add_argument ( "--batch-size",  help="batch size for training", required=False, type=int,  default=16 )
+    subParser.add_argument ( "--epochs",  help="number of epochs to run", required=False, type=int,  default=300 )
+    subParser.add_argument ( "--workers",  help="number background workers", required=False, type=int,  default=4 )
+    subParser.add_argument ( "--tensorboard", help="directory for tensor board" )
+    subParser.add_argument ( "--model-image", help="save a PNG of the model" )
+    subParser.add_argument ( "--model", help="model type, must be resnet18, resnet34, resnet50, resnet101, resnet152, resnet200", default='resnet18' )
+    subParser.add_argument ( "dataPath", help="path to directory data and segmentations")
+    subParser.add_argument ( "subjects", help="JSON file with subject data, generated using preprocess")
+    subParser.add_argument ( "weightsFilename", help="save weights to this file in HDF5 format")
+    
+    logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    args = masterParser.parse_args()
+    logging.getLogger().setLevel ( logging.INFO )
+    if args.debug:
+        logging.getLogger().setLevel ( logging.DEBUG )
 
-  logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-  args = masterParser.parse_args()
-  logging.getLogger().setLevel ( logging.INFO )
-  if args.debug:
-    logging.getLogger().setLevel ( logging.DEBUG )
-  
-  args.function ( args )
+    args.function ( args )
 
